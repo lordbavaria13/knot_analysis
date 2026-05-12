@@ -248,23 +248,14 @@ class KnotPredictor:
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
 
-    def predict_with_pipeline(self, img_bgr, p_cnn):
+    def predict_with_pipeline(self, img_bgr, p_cnn, mask):
         if not self.is_loaded: return "Fehler", 0.0, None
         
-        # Canny Pipeline Mask
-        gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (p_cnn['blur_k'], p_cnn['blur_k']), 0)
-        edges = cv2.Canny(blurred, p_cnn['canny_l'], p_cnn['canny_h'], apertureSize=3, L2gradient=True)
         
-        kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (p_cnn['c_k'], p_cnn['c_k']))
-        edges_closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel_close, iterations=p_cnn['c_iter'])
-        edges_dilated = cv2.dilate(edges_closed, kernel_close, iterations=p_cnn['d_iter'])
+        h, w = mask.shape
+        cv2.rectangle(mask, (0, 0), (w-1, h-1), 0, thickness=p_cnn['b_thick'])
         
-        mask_filled = fill_holes(edges_dilated)
-        h, w = mask_filled.shape
-        cv2.rectangle(mask_filled, (0, 0), (w-1, h-1), 0, thickness=p_cnn['b_thick'])
-        
-        mask_blurred = cv2.GaussianBlur(mask_filled, (p_cnn['s_blur'], p_cnn['s_blur']), 0)
+        mask_blurred = cv2.GaussianBlur(mask, (p_cnn['s_blur'], p_cnn['s_blur']), 0)
         _, mask_smooth = cv2.threshold(mask_blurred, 127, 255, cv2.THRESH_BINARY)
         
         kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (p_cnn['o_k'], p_cnn['o_k']))
@@ -298,22 +289,15 @@ class KnotPredictor:
         y2_box = min(h_img, cy + side // 2)
         
         knot_crop = img_bgr[y1_box:y2_box, x1_box:x2_box]
-        knot_mask_rough = mask_main[y1_box:y2_box, x1_box:x2_box]
-        
-        if knot_crop.size == 0: return "Fehler", 0.0, None
-        
-        # GrabCut
-        gc_mask = np.where(knot_mask_rough > 0, cv2.GC_PR_FGD, cv2.GC_BGD).astype('uint8')
-        bgdModel = np.zeros((1, 65), np.float64)
-        fgdModel = np.zeros((1, 65), np.float64)
-        try:
-            cv2.grabCut(knot_crop, gc_mask, None, bgdModel, fgdModel, p_cnn['gc_iter'], cv2.GC_INIT_WITH_MASK)
-        except: pass
-        
-        refined_mask = np.where((gc_mask == cv2.GC_FGD) | (gc_mask == cv2.GC_PR_FGD), 255, 0).astype('uint8')
+        refined_mask = mask_main[y1_box:y2_box, x1_box:x2_box]
+        refined_mask = fill_holes(refined_mask)
         refined_mask, _ = keep_largest_component(refined_mask)
-        kernel_gc_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
-        refined_mask = cv2.morphologyEx(refined_mask, cv2.MORPH_CLOSE, kernel_gc_close, None, None, 1)
+        refined_mask = cv2.morphologyEx(
+            refined_mask,
+            cv2.MORPH_CLOSE,
+            cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9)),
+            None, None, 1
+        )
 
         # CNN preparation
         gray_crop = cv2.cvtColor(knot_crop, cv2.COLOR_BGR2GRAY)

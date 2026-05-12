@@ -50,17 +50,7 @@ class AchtknotenApp:
         self.add_param(tab_geo, "Prune Length (px)", "40")
 
         # 2. Parameter for CNN
-        self.add_param(tab_cnn, "Blur Kernel", "15")
-        self.add_param(tab_cnn, "Canny Low", "5")
-        self.add_param(tab_cnn, "Canny High", "60")
-        self.add_param(tab_cnn, "Close Kernel (CNN)", "15")
-        self.add_param(tab_cnn, "Close Iterations (CNN)", "10")
-        self.add_param(tab_cnn, "Dilate Iterations", "3")
         self.add_param(tab_cnn, "Border Thickness", "10")
-        self.add_param(tab_cnn, "Smooth Blur", "21")
-        self.add_param(tab_cnn, "Open Kernel (CNN)", "5")
-        self.add_param(tab_cnn, "Open Iterations", "1")
-        self.add_param(tab_cnn, "GrabCut Iterations", "3")
 
         self.btn_analyze = tk.Button(left_frame, text="Start!", command=self.start_analysis, bg="#50E3C2", fg="black", font=('Arial', 10, 'bold'))
         self.btn_analyze.pack(fill=tk.X, pady=(15, 5))
@@ -167,17 +157,7 @@ class AchtknotenApp:
             }
             # CNN-Parameter
             p_cnn = {
-                'blur_k': int(self.params["Blur Kernel"].get()),
-                'canny_l': int(self.params["Canny Low"].get()),
-                'canny_h': int(self.params["Canny High"].get()),
-                'c_k': int(self.params["Close Kernel (CNN)"].get()),
-                'c_iter': int(self.params["Close Iterations (CNN)"].get()),
-                'd_iter': int(self.params["Dilate Iterations"].get()),
                 'b_thick': int(self.params["Border Thickness"].get()),
-                's_blur': int(self.params["Smooth Blur"].get()),
-                'o_k': int(self.params["Open Kernel (CNN)"].get()),
-                'o_iter': int(self.params["Open Iterations"].get()),
-                'gc_iter': int(self.params["GrabCut Iterations"].get()),
             }
         except ValueError:
             messagebox.showerror("Fehler", "Bitte überprüfe, ob alle Parameter gültige Zahlen sind.")
@@ -210,7 +190,7 @@ class AchtknotenApp:
             overlay = ip.make_overlay(self.current_img_bgr, mask_clean, skeleton, crossings)
             
             # 2. CNN Prediction
-            cnn_class, cnn_conf, debug_img = ip.predictor.predict_with_pipeline(self.current_img_bgr, p_cnn)
+            cnn_class, cnn_conf, debug_img = ip.predictor.predict_with_pipeline(self.current_img_bgr, p_cnn, mask_clean)
 
             self.root.after(0, self.finish_analysis, mask_clean, overlay, debug_img, len(crossings), cnn_class, cnn_conf, None)
 
