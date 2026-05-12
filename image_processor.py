@@ -5,12 +5,8 @@ import torch
 import torch.nn as nn
 from torchvision import models, transforms
 from PIL import Image
+from cv2 import ximgproc
 
-try:
-    from cv2 import ximgproc
-    HAS_XIMGPROC = True
-except Exception:
-    HAS_XIMGPROC = False
 
 RING_OFFSETS = [
     (-1, -1), (0, -1), (1, -1),
@@ -19,12 +15,15 @@ RING_OFFSETS = [
 ]
 
 def choose_best_channel(img_bgr):
-    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    #gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
     hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
     lab = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2LAB)
     channels = {
-        'Gray': gray, 'H': hsv[:, :, 0], 'S': hsv[:, :, 1], 'V': hsv[:, :, 2],
-        'L': lab[:, :, 0], 'A': lab[:, :, 1], 'B': lab[:, :, 2],
+        #'Gray': gray, 
+        'H': hsv[:, :, 0], 'S': hsv[:, :, 1], 
+        #'V': hsv[:, :, 2],
+        #'L': lab[:, :, 0], 
+        'A': lab[:, :, 1], 'B': lab[:, :, 2],
     }
     best_name, best_ch, best_score = None, None, -1.0
     for name, ch in channels.items():
@@ -64,19 +63,8 @@ def keep_largest_component(mask):
     result[labels == largest_label] = 255
     return result, largest_area
 
-def flatten_illumination(img_bgr, kernel_size=151, add_brightness=150):
-    lab = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2LAB)
-    l_channel, a_channel, b_channel = cv2.split(lab)
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
-    background = cv2.morphologyEx(l_channel, cv2.MORPH_OPEN, kernel)
-    l_flat = cv2.subtract(l_channel, background)
-    l_flat = cv2.add(l_flat, add_brightness)
-    lab_flat = cv2.merge((l_flat, a_channel, b_channel))
-    return cv2.cvtColor(lab_flat, cv2.COLOR_LAB2BGR)
-
 def build_rope_mask(img_bgr, close_k=(11,11), open_k=(6,6), close_iter=9, flat_k=151, flat_add=150):
-    img_flat = flatten_illumination(img_bgr, kernel_size=flat_k, add_brightness=flat_add)
-    best_name, best_channel, best_score = choose_best_channel(img_flat)
+    best_name, best_channel, best_score = choose_best_channel(img_bgr)
     _, mask_raw = cv2.threshold(best_channel, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
     mask_raw = smart_invert(mask_raw)
     kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, close_k)
@@ -105,14 +93,7 @@ def count_neighbor_groups(sk01, x, y):
 
 
 def prune_skeleton(skel, prune_iter=40):
-    """
-    Entfernt iterativ (Pixel für Pixel) die toten Enden des Skeletts.
-    """
     skel_clean = skel.copy()
-    
-    kernel = np.array([[1, 1, 1],
-                       [1, 0, 1],
-                       [1, 1, 1]], dtype=np.uint8)
                        
     for _ in range(prune_iter):
         skel_bin = (skel_clean > 0).astype(np.uint8)
@@ -156,8 +137,7 @@ def fill_holes(mask):
     return filled[1:-1, 1:-1]
 
 def analyze_skeleton_crossings(mask, border_margin=30, region_merge_size=5, min_merge_px=20, rel_diag_factor=0.015, prune_length=40):
-    _, mask_bin = cv2.threshold(mask, 127, 255, cv2.THRESH_BINARY)
-    mask_bin, _ = keep_largest_component(mask_bin)
+    mask_bin = mask.copy()
 
     h, w = mask_bin.shape
     
@@ -170,12 +150,6 @@ def analyze_skeleton_crossings(mask, border_margin=30, region_merge_size=5, min_
     mask_bin = cv2.morphologyEx(mask_bin, cv2.MORPH_CLOSE, k_smooth)
     mask_bin = cv2.morphologyEx(mask_bin, cv2.MORPH_OPEN, k_smooth)
     
-    mask_bin, _ = keep_largest_component(mask_bin)
-    
-    k3 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    k5 = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
-    mask_bin = cv2.morphologyEx(mask_bin, cv2.MORPH_OPEN, k3, iterations=1)
-    mask_bin = cv2.morphologyEx(mask_bin, cv2.MORPH_CLOSE, k5, iterations=1)
     mask_bin, _ = keep_largest_component(mask_bin)
 
     skel = thin_binary(mask_bin)
@@ -247,9 +221,6 @@ def make_overlay(image_bgr, mask, skeleton, crossings):
         cv2.circle(overlay, (cx, cy), 6, (255, 0, 0), -1)
         cv2.putText(overlay, str(i + 1), (cx + 20, cy - 20), cv2.FONT_HERSHEY_DUPLEX, 1.3, (255, 0, 255), 3)
 
-    count_text = f"Gefundene Kreuzungen: {len(crossings)}"
-    cv2.putText(overlay, count_text, (30, 60), cv2.FONT_HERSHEY_DUPLEX, 1.5, (0, 255, 0), 4)
-
     return overlay
 
 
@@ -278,7 +249,6 @@ class KnotPredictor:
         ])
 
     def predict_with_pipeline(self, img_bgr, p_cnn):
-        """Führt die komplette CNN Canny-Pipeline mit dynamischen Parametern aus der GUI durch"""
         if not self.is_loaded: return "Fehler", 0.0, None
         
         # Canny Pipeline Mask

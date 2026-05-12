@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms, models
 from torch.utils.data import DataLoader
-from torch.cuda.amp import GradScaler, autocast # NEU: Für massiv schnelleres GPU Training
+from torch.cuda.amp import GradScaler, autocast
 import os
 import copy
 import multiprocessing
@@ -67,7 +67,7 @@ def train_model():
     
     scaler = GradScaler()
 
-    print("\n=== PHASE 1: Warm-up (Nur letzte Schicht trainieren) ===")
+    print("\n=== PHASE 1: Warm-up (train last layer) ===")
     epochs_phase1 = 5
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
@@ -108,7 +108,7 @@ def train_model():
         val_acc = val_corrects.double() / len(val_dataset)
         print(f"Epoche {epoch+1}/{epochs_phase1} | Train Loss: {epoch_loss:.4f} | Train Acc: {epoch_acc:.2%} | Val Acc: {val_acc:.2%}")
 
-    print("\n=== PHASE 2: Fine-Tuning (Gesamtes Modell wird aufgeweicht) ===")
+    print("\n=== PHASE 2: Fine-Tuning (train all layers) ===")
     
     for param in model.parameters():
         param.requires_grad = True

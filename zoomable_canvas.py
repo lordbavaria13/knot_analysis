@@ -48,7 +48,6 @@ class ZoomableCanvas(tk.Frame):
 
     def zoom(self, event):
         if not self.original_image: return
-        # Windows: event.delta
         if getattr(event, 'num', 0) == 4 or getattr(event, 'delta', 0) > 0:
             self.scale *= 1.2 
         elif getattr(event, 'num', 0) == 5 or getattr(event, 'delta', 0) < 0:

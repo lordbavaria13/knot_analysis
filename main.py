@@ -6,6 +6,7 @@ import threading
 # import modules
 import image_processor as ip
 from zoomable_canvas import ZoomableCanvas
+from live_capture import LiveCaptureWindow
 
 class AchtknotenApp:
     def __init__(self, root):
@@ -25,6 +26,9 @@ class AchtknotenApp:
         btn_upload = tk.Button(left_frame, text="Upload Picture", command=self.load_image, bg="#4A90E2", fg="white", font=('Arial', 10, 'bold'))
         btn_upload.pack(fill=tk.X, pady=(0, 15))
 
+        btn_live = tk.Button(left_frame, text="Live-Capture", command=self.open_live_capture, bg="#E24A7A", fg="white", font=('Arial', 10, 'bold'))
+        btn_live.pack(fill=tk.X, pady=(0, 15))
+
         # --- PARAMETER Choice ---
         param_notebook = ttk.Notebook(left_frame)
         param_notebook.pack(fill=tk.X, pady=5)
@@ -39,8 +43,6 @@ class AchtknotenApp:
         self.add_param(tab_geo, "Close Kernel (Geo)", "11")
         self.add_param(tab_geo, "Open Kernel (Geo)", "6")
         self.add_param(tab_geo, "Close Iterations (Geo)", "9")
-        self.add_param(tab_geo, "Flatten Kernel", "151")
-        self.add_param(tab_geo, "Flatten Brightness", "150")
         self.add_param(tab_geo, "Border Margin", "30")
         self.add_param(tab_geo, "Region Merge", "5")
         self.add_param(tab_geo, "Min Merge px", "20")
@@ -111,6 +113,20 @@ class AchtknotenApp:
         entry.pack(side=tk.RIGHT)
         self.params[label_text] = entry
 
+    def open_live_capture(self):
+        LiveCaptureWindow(self.root, self)
+
+    def load_from_capture(self, img_bgr):
+        self.current_img_bgr = img_bgr
+        self.canvas_orig.set_image(self.current_img_bgr)
+        self.notebook.select(self.tab_orig)
+        self.result_var.set("-")
+        self.raw_stats_var.set("Details...")
+
+        self.canvas_mask.canvas.delete("all")
+        self.canvas_overlay.canvas.delete("all")
+        self.canvas_cnn.canvas.delete("all")
+
     def load_image(self):
         filepath = filedialog.askopenfilename(filetypes=[("Image Files", "*.jpg *.jpeg *.png *.bmp")])
         if not filepath: return
@@ -143,8 +159,6 @@ class AchtknotenApp:
                 'c_k': int(self.params["Close Kernel (Geo)"].get()),
                 'o_k': int(self.params["Open Kernel (Geo)"].get()),
                 'c_iter': int(self.params["Close Iterations (Geo)"].get()),
-                'f_k': int(self.params["Flatten Kernel"].get()),
-                'f_add': int(self.params["Flatten Brightness"].get()),
                 'b_margin': int(self.params["Border Margin"].get()),
                 'r_merge': int(self.params["Region Merge"].get()),
                 'min_merge': int(self.params["Min Merge px"].get()),
@@ -181,7 +195,7 @@ class AchtknotenApp:
             mask_clean = ip.build_rope_mask(
                 self.current_img_bgr, 
                 close_k=(p_geo['c_k'], p_geo['c_k']), open_k=(p_geo['o_k'], p_geo['o_k']), 
-                close_iter=p_geo['c_iter'], flat_k=p_geo['f_k'], flat_add=p_geo['f_add']
+                close_iter=p_geo['c_iter']
             )
 
             cross_result = ip.analyze_skeleton_crossings(

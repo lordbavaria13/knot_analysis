@@ -1,4 +1,8 @@
-This application is a hybrid computer vision and deep learning tool for the automated detection and validation of tied figure-eight knots. The system combines a **geometric topology analysis** (skeletonization and intersection counting) with a **fine-tuned Convolutional Neural Network (ResNet18)** to ensure maximum accuracy.
+This application is a hybrid computer vision and deep learning tool for the automated detection 
+and validation of tied figure-eight knots. The system combines a **geometric topology analysis** 
+(skeletonization and intersection counting) with a **fine-tuned Convolutional Neural Network (ResNet18)** 
+to ensure maximum accuracy. Image acquisition is supported both via local file upload and 
+**live smartphone camera** using the DroidCam app.
 
 ---
 
@@ -8,84 +12,158 @@ This application is a hybrid computer vision and deep learning tool for the auto
 The program requires **Python 3.8** or newer (recommended: 3.10+).
 
 ### 2. Install Required Libraries
-Open your terminal / command prompt and install the required packages using the following command:
+Open your terminal / command prompt and install all required packages:
 
 ```bash
 pip install opencv-python opencv-contrib-python torch torchvision Pillow numpy
 ```
 
-**IMPORTANT:** The `opencv-contrib-python` package is strictly required because it contains the `ximgproc` module (Zhang-Suen Thinning Algorithm) needed for the skeletonization of the knot!
+**IMPORTANT:** The `opencv-contrib-python` package is strictly required because it contains the 
+`ximgproc` module (Zhang-Suen Thinning Algorithm) used for skeletonization of the knot!
 
 ### 3. Model File
-Ensure that the trained model file **`knoten_resnet18_finetuned.pth`** is located in the same directory as the Python scripts.
+Ensure that the trained model file **`knoten_resnet18_finetuned.pth`** is located in the same 
+directory as the Python scripts. The model is a ResNet18 fine-tuned on 7,000 images of 
+correct and incorrect figure-eight knots.
+
+---
+
+## 📂 Project File Structure
+
+```
+📁 project/
+├── main.py                            ← Main GUI application (entry point)
+├── image_processor.py                 ← CV pipeline: masking, skeletonization, CNN predictor
+├── pipeline.py                        ← Standalone Canny pipeline for batch processing
+├── live_capture.py                    ← DroidCam live capture window
+├── zoomable_canvas.py                 ← Reusable zoomable image viewer widget
+├── knoten_resnet18_finetuned.pth      ← Trained ResNet18 model weights
+├── train_resnet18.py                  ← Training script (offline, not needed to run the app)
+├── batch_process_knots.py             ← Dataset preprocessing script (offline)
+└── split_dataset.py                   ← Train/Val split script (offline)
+```
 
 ---
 
 ## 📚 Libraries Used
 
-*   **OpenCV (`cv2`) & `cv2.ximgproc`**: Image processing, filtering, Canny edge detection, GrabCut segmentation, morphology, and skeletonization.
-*   **PyTorch (`torch`, `torch.nn`)**: Deep learning framework for executing the neural network.
-*   **Torchvision (`torchvision.models`, `transforms`)**: Provides the ResNet18 architecture and image transformations (scaling, normalization).
-*   **Tkinter (`tkinter`)**: Creation of the Graphical User Interface (GUI).
-*   **NumPy (`numpy`)**: Efficient matrix and array computations (images are processed as NumPy arrays).
-*   **Pillow (`PIL`)**: Format conversion between OpenCV matrices and PyTorch tensors.
-*   **Threading (`threading`)**: Offloading the analysis to a background thread so the GUI remains responsive during computation.
+| Library | Purpose |
+|---|---|
+| `opencv-python` (`cv2`) | Core image processing: filtering, morphology, Canny, GrabCut, contours |
+| `opencv-contrib-python` (`cv2.ximgproc`) | Zhang-Suen skeletonization for topology analysis |
+| `torch`, `torch.nn` | Deep learning framework for running ResNet18 inference |
+| `torchvision` | ResNet18 architecture and image normalization transforms |
+| `Pillow` (`PIL`) | Converting OpenCV arrays to PIL images for PyTorch |
+| `numpy` | Efficient array/matrix computations on image data |
+| `tkinter` | Cross-platform GUI framework |
+| `threading` | Background thread for analysis to keep GUI responsive |
 
 ---
 
-## How to Use the Application
+## 🚀 How to Use the Application
 
-1.  Start the main program via the terminal:
-    ```bash
-    python main.py
-    ```
-2.  Click on **"Bild hochladen" (Upload Image)** in the left sidebar and select a photo of a knot.
-3.  *(Optional)* Adjust the parameters in the **"Geometrie" (Geometry)** or **"CNN Pipeline"** tabs to match the current lighting conditions or rope type.
-4.  Click on **"Analysieren" (Analyze)**.
-5.  The result will be displayed in the bottom left. On the right side, you can switch between different views using the **tabs**:
-    *   **Originalbild (Original Image)**: The uploaded image.
-    *   **Mask Clean**: The cleaned black-and-white mask from the geometric analysis.
-    *   **Kreuzungen (Intersections)**: The original image overlaid with the computed skeleton (red) and the detected intersection points (yellow circles).
-    *   **CNN Beweisbild (CNN Proof Image)**: Shows the isolated knot exactly as the neural network sees it, including the percentage-based confidence.
-6.  **Zoom Function:** In any tab, you can use the **mouse wheel** to zoom in and hold the **left mouse button** to pan the image.
+Start the application by running:
 
-## Parameter Explanation (GUI)
+```bash
+python main.py
+```
 
-The program uses two separate pipelines, whose parameters can be adjusted live in the sidebar.
+### Option A: Upload an Image
+1. Click **Upload Image** in the left sidebar.
+2. Select a `.jpg`, `.jpeg`, `.png`, or `.bmp` file of a knot.
 
-### Tab 1: Geometry (Skeleton)
-These parameters control the creation of the solid rope mask and the detection of intersection points.
+### Option B: Live Capture via DroidCam 📷
+1. Install the **DroidCam** app on your smartphone (available for Android & iOS).
+2. Open the DroidCam app — it will display the device's **IP address** and **port**.
+3. Click **Live Capture** in the sidebar.
+4. Enter the IP address and port from the app into the connection dialog.
+5. Click **"Connect"** — a live preview will appear immediately.
+6. Click **capture image** to freeze the current frame.
+7. Click **accept** to load the captured image into the main application,
+   **retake** to retake, or **close** to close and disconnect.
 
-*   **Close / Open Kernel (Geo):** Size of the oval "brush" (in pixels) to close gaps in the mask (Close) or remove noise (Open).
-*   **Close Iterations (Geo):** How often the close operation is repeated. Higher values make the rope more solid.
-*   **Flatten Kernel & Brightness:** Parameters for shadow removal (CLAHE/Morphology). Evens out uneven background lighting.
-*   **Border Margin:** Distance to the image edge in pixels. Intersections in this area are ignored (prevents errors from cut-off rope ends).
-*   **Region Merge & Min Merge px:** Merges multiple closely clustered intersection points into a single logical center.
-*   **Prune Length (px):** "Trims" the skeleton. Removes protruding, dead branches at the edge of the skeleton that could falsely be detected as intersections.
+### Running the Analysis
+1. After loading an image, click **Analyze**.
+2. The result appears in the bottom-left. Switch between image tabs on the right:
 
-### Tab 2: CNN Pipeline
-These parameters prepare the image specifically for the GrabCut algorithm and ResNet18.
+| Tab | Content |
+|---|---|
+| **Original** | The uploaded or captured raw image |
+| **Mask** | The cleaned binary mask from the geometric pipeline |
+| **Crossing** | Overlay with computed skeleton (red) and intersection points (yellow circles) |
+| **CNN picture** | The isolated knot crop exactly as seen by the neural network, with confidence % |
 
-*   **Blur Kernel:** Strength of the blur before edge detection. Very important for striped ropes to blur the texture.
-*   **Canny Low / High:** Thresholds for edge detection. Determines the contrast difference required for a pixel to be considered an "edge".
-*   **Close / Dilate Iterations:** How strongly the found edges are inflated and thickened before being flooded into a solid area (`fill_holes`).
-*   **Border Thickness:** Draws an artificial black border around the image. Strictly necessary so the `fill_holes` algorithm doesn't flood the background if the rope touches the edge.
-*   **Smooth Blur & Open Kernel:** Rounds off the hard, blocky edges after mask creation, as GrabCut works better with smooth masks.
-*   **GrabCut Iterations:** How persistently the GrabCut algorithm attempts to fit the edges of the preliminary mask to the actual rope in the image.
+> **Zoom:** Use the **mouse wheel** to zoom in any tab. **Left-click + drag** to pan.
 
 ---
 
-## Decision Logic: Is it a Figure-Eight Knot?
+## ⚙️ Parameter Explanation (GUI)
 
-The program does not make a blind decision, but combines the "understanding" of both systems (Topology + Pattern Recognition). A perfect figure-eight knot mathematically has exactly **4 to 6 intersection points**.
+Two independent pipelines can be configured live in the left sidebar.
 
-The final output is calculated according to the following weighting:
+### Tab 1: Geometry (Skeleton) — Intersection Counting
+Controls the creation of the rope mask and detection of topology crossings.
 
-1.  🛑 **FALSE (CNN Veto):**
-    If the CNN is **> 95% sure that the knot is wrong**, it overrides the geometry. *(Reason: The intersection count might be correct by chance, but the CNN detected a severe structural flaw).*
-2.  ✅ **CORRECT (Double Validated):**
-    If 4 to 6 intersection points were found **AND** the CNN is > 85% sure that it is a figure-eight knot.
-3.  ⚠️ **CORRECT (Topology):**
-    If 4 to 6 intersection points were found, but the CNN is unsure (or leans slightly towards 'wrong'). *(Reason: The physical structure of the knot is correct; the CNN is likely just confused by strange lighting or an unusual angle).*
-4.  ❌ **FALSE (X Intersections):**
-    In all other cases (e.g., 2 intersections found and no strong CNN veto). The physical topology of the knot is incorrect.
+| Parameter | Description |
+|---|---|
+| **Close / Open Kernel (Geo)** | Size of the oval morphological brush to close gaps (Close) or remove noise (Open) |
+| **Close Iterations (Geo)** | Repetitions of the close operation. Higher = more solid rope shape |
+| **Flatten Kernel & Brightness** | Shadow removal via morphological background subtraction. Compensates uneven lighting |
+| **Border Margin** | Pixel margin at image edge. Crossings inside this zone are ignored |
+| **Region Merge & Min Merge px** | Merges nearby candidate crossings into a single logical center point |
+| **Prune Length (px)** | Trims dead-end branches from the skeleton that would falsely count as crossings |
+
+### Tab 2: CNN Pipeline — Neural Network Input
+Controls how the rope image is prepared before being passed to ResNet18.
+
+| Parameter | Description |
+|---|---|
+| **Blur Kernel** | Pre-Canny blur strength. Important for striped ropes to suppress texture |
+| **Canny Low / High** | Thresholds for edge detection. Contrast below Low is ignored; above High is always an edge |
+| **Close / Dilate Iterations** | Inflates detected edges to form a solid filled mask before GrabCut |
+| **Border Thickness** | Black border around image. Prevents `fill_holes` from flooding the background |
+| **Smooth Blur & Open Kernel** | Softens the binary mask for cleaner GrabCut segmentation |
+| **GrabCut Iterations** | How hard GrabCut tries to fit mask boundaries to the actual rope |
+
+---
+
+## 🧠 Decision Logic: Is it a Figure-Eight Knot?
+
+The program combines results from both systems. A mathematically correct figure-eight knot 
+has exactly **4 to 6 intersection points** in its skeleton topology.
+
+| Condition | Output |
+|---|---|
+| CNN confidence `wrong` **> 95%** | 🛑 **FALSE (CNN Veto)** — structural flaw detected, overrides geometry |
+| 4–6 crossings **AND** CNN `correct` **> 85%** | ✅ **CORRECT (Double Validated)** — both methods agree |
+| 4–6 crossings, CNN unsure or mildly negative | ⚠️ **CORRECT (Topology)** — structure is right, CNN may be confused by lighting |
+| Any other case | ❌ **FALSE (X Crossings)** — topology is wrong |
+
+---
+
+## 🤖 Model Training (Background Information)
+
+The ResNet18 model was trained using a custom dataset of **7,000 images** (3,500 correct, 
+3,500 incorrect figure-eight knots). Images were preprocessed through the Canny pipeline 
+(masking, GrabCut, CLAHE enhancement) before training. A two-phase transfer learning 
+strategy was used:
+
+- **Phase 1 (Warm-up, 5 epochs):** Only the final classification layer was trained. All 
+  ResNet feature extraction layers were frozen.
+- **Phase 2 (Fine-tuning, 10 epochs):** All layers were unfrozen and trained with a 
+  low learning rate (`1e-4`) and a Cosine Annealing scheduler.
+
+**Final validation accuracy: 97.75%**
+
+---
+
+## ⚠️ Important Notes on Code Originality
+
+The following external resources were used in this project:
+
+- **ResNet18 pre-trained weights** from `torchvision.models` (ImageNet, PyTorch Hub)
+- **Zhang-Suen Thinning** via `cv2.ximgproc.thinning` (OpenCV Contrib)
+- **GrabCut algorithm** via `cv2.grabCut` (OpenCV)
+
+All other logic (pipeline design, topology analysis, decision fusion, GUI, training scripts, 
+data collection) is original work developed for this project.
